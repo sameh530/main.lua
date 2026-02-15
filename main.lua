@@ -1,4 +1,4 @@
--- [[ SAMEH HUB VIP - V2.8 RE-SPAWN & DEATH TRACKING FIX ]]
+-- [[ SAMEH HUB VIP - V3.0 FINAL STABLE EDITION ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,16 +22,21 @@ local Options = {
 local LockedTarget = nil 
 local IsLocking = false 
 
--- [[ وظيفة الفحص المتقدمة لمنع ملاحقة الموتى أو من يعيدون الرسبون ]]
+-- [[ وظيفة التحقق الصارمة: تمنع استهداف أي شخص خارج حدود الماب ]]
 local function IsValid(p)
-    if p and p.Character and p.Character:IsDescendantOf(workspace) then
+    if p and p.Character and p.Character:FindFirstChild(Options.TargetPart) then
         local char = p.Character
         local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        local root = char:FindFirstChild("HumanoidRootPart")
         
-        if humanoid and rootPart then
-            -- فحص الصحة + فحص أن الشخصية ليست في طور الاختفاء/الرسبون
-            if humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+        if humanoid and root then
+            -- 1. فحص الصحة
+            -- 2. فحص المسافة العمودية: إذا سقط الشخص تحت الماب (Y < -50) أو طار فوق (Y > 1000) يتوقف فوراً
+            -- 3. فحص الـ Velocity: إذا كان يسقط بسرعة الموت
+            local pos = root.Position
+            local vel = root.AssemblyLinearVelocity.Y
+            
+            if humanoid.Health > 0 and pos.Y > -50 and pos.Y < 1000 and vel > -60 then
                 return true
             end
         end
@@ -48,7 +53,7 @@ local function IsVisible(targetPart)
     return result == nil
 end
 
--- [[ محرك الايمبوت مع نظام التصفية الفوري ]]
+-- [[ محرك الايمبوت ]]
 RunService.RenderStepped:Connect(function()
     if Options.Aimbot then
         if Options.AimLock then
@@ -60,7 +65,6 @@ RunService.RenderStepped:Connect(function()
             end
         else
             if UserInputService:IsKeyDown(Options.AimKey) then
-                -- إذا مات الهدف الحالي، نقوم بتصفير المتغير فوراً للبحث عن غيره
                 if not IsValid(LockedTarget) then
                     LockedTarget = nil
                     local target, dist = nil, math.huge
@@ -90,7 +94,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- رصد زر التثبيت
+-- رصد زر التثبيت (Lock)
 UserInputService.InputBegan:Connect(function(i, g)
     if not g and i.KeyCode == Options.AimKey and Options.Aimbot and Options.AimLock then
         if IsLocking then IsLocking = false; LockedTarget = nil
@@ -114,7 +118,7 @@ UserInputService.InputBegan:Connect(function(i, g)
     end
 end)
 
--- [[ ميزات اللاعب (سرعة، قفز، طيران) ]]
+-- [[ ميزات اللاعب (Speed, Jump, Fly) ]]
 local BodyGyro, BodyVelocity
 RunService.RenderStepped:Connect(function()
     if Options.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -173,17 +177,14 @@ end
 for _, v in pairs(Players:GetPlayers()) do if v ~= LocalPlayer then CreateESP(v) end end
 Players.PlayerAdded:Connect(CreateESP)
 
--- [[ الواجهة الرسومية ]]
+-- [[ الواجهة الرسومية كاملة ]]
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 600, 0, 420); Main.Position = UDim2.new(0.5, -300, 0.5, -210)
-Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); Main.BorderSizePixel = 0
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
-Instance.new("UIStroke", Main).Color = Color3.fromRGB(80, 0, 255)
+Main.Size = UDim2.new(0, 600, 0, 420); Main.Position = UDim2.new(0.5, -300, 0.5, -210); Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); Main.BorderSizePixel = 0
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12); Instance.new("UIStroke", Main).Color = Color3.fromRGB(80, 0, 255)
 
-local Sidebar = Instance.new("Frame", Main)
-Sidebar.Size = UDim2.new(0, 160, 1, 0); Sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10); Instance.new("UICorner", Sidebar)
-local Logo = Instance.new("TextLabel", Sidebar); Logo.Size = UDim2.new(1, 0, 0, 60); Logo.Text = "SAMEH VIP"; Logo.TextColor3 = Color3.fromRGB(80, 0, 255); Logo.Font = "GothamBold"; Logo.TextSize = 22; Logo.BackgroundTransparency = 1
+local Sidebar = Instance.new("Frame", Main); Sidebar.Size = UDim2.new(0, 160, 1, 0); Sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10); Instance.new("UICorner", Sidebar)
+local Logo = Instance.new("TextLabel", Sidebar); Logo.Size = UDim2.new(1, 0, 0, 60); Logo.Text = "SAMEH HUB"; Logo.TextColor3 = Color3.fromRGB(80, 0, 255); Logo.Font = "GothamBold"; Logo.TextSize = 22; Logo.BackgroundTransparency = 1
 
 local Pages = Instance.new("Frame", Main); Pages.Size = UDim2.new(1, -170, 1, -20); Pages.Position = UDim2.new(0, 165, 0, 10); Pages.BackgroundTransparency = 1
 
