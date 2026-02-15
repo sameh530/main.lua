@@ -1,4 +1,4 @@
--- [[ SAMEH HUB VIP - V2.6 FULL RESTORED & DEATH FIX ]]
+-- [[ SAMEH HUB VIP - V2.8 RE-SPAWN & DEATH TRACKING FIX ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,15 +22,18 @@ local Options = {
 local LockedTarget = nil 
 local IsLocking = false 
 
--- [[ وظيفة التحقق المحدثة: تمنع ملاحقة الموتى واللاعبين في الرسبون ]]
+-- [[ وظيفة الفحص المتقدمة لمنع ملاحقة الموتى أو من يعيدون الرسبون ]]
 local function IsValid(p)
-    if p and p.Character and p.Character:FindFirstChild(Options.TargetPart) and p.Character:FindFirstChild("Humanoid") then
-        local humanoid = p.Character.Humanoid
-        local rootPart = p.Character:FindFirstChild("HumanoidRootPart")
+    if p and p.Character and p.Character:IsDescendantOf(workspace) then
+        local char = p.Character
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
         
-        -- التحقق: 1.الصحة أكبر من صفر / 2.الجسم لم ينزل تحت الخريطة (الرسبون)
-        if humanoid.Health > 0 and rootPart and rootPart.Position.Y > -400 then 
-            return true
+        if humanoid and rootPart then
+            -- فحص الصحة + فحص أن الشخصية ليست في طور الاختفاء/الرسبون
+            if humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+                return true
+            end
         end
     end
     return false
@@ -38,16 +41,14 @@ end
 
 local function IsVisible(targetPart)
     if not Options.WallCheck then return true end
-    local character = LocalPlayer.Character
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {character, targetPart.Parent}
-    local direction = (targetPart.Position - Camera.CFrame.Position)
-    local result = workspace:Raycast(Camera.CFrame.Position, direction, params)
+    params.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    local result = workspace:Raycast(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position), params)
     return result == nil
 end
 
--- [[ محرك الايمبوت المصلح ]]
+-- [[ محرك الايمبوت مع نظام التصفية الفوري ]]
 RunService.RenderStepped:Connect(function()
     if Options.Aimbot then
         if Options.AimLock then
@@ -59,15 +60,15 @@ RunService.RenderStepped:Connect(function()
             end
         else
             if UserInputService:IsKeyDown(Options.AimKey) then
-                if IsValid(LockedTarget) then
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, LockedTarget.Character[Options.TargetPart].Position)
-                else
+                -- إذا مات الهدف الحالي، نقوم بتصفير المتغير فوراً للبحث عن غيره
+                if not IsValid(LockedTarget) then
+                    LockedTarget = nil
                     local target, dist = nil, math.huge
                     for _, p in pairs(Players:GetPlayers()) do
                         if p ~= LocalPlayer and IsValid(p) then
                             if Options.TeamCheck and p.Team == LocalPlayer.Team then continue end
-                            local part = p.Character[Options.TargetPart]
-                            if IsVisible(part) then
+                            local part = p.Character:FindFirstChild(Options.TargetPart)
+                            if part and IsVisible(part) then
                                 local pos, on = Camera:WorldToViewportPoint(part.Position)
                                 if on then
                                     local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
@@ -78,6 +79,10 @@ RunService.RenderStepped:Connect(function()
                     end
                     LockedTarget = target
                 end
+                
+                if LockedTarget and LockedTarget.Character then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, LockedTarget.Character[Options.TargetPart].Position)
+                end
             else
                 LockedTarget = nil
             end
@@ -85,6 +90,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- رصد زر التثبيت
 UserInputService.InputBegan:Connect(function(i, g)
     if not g and i.KeyCode == Options.AimKey and Options.Aimbot and Options.AimLock then
         if IsLocking then IsLocking = false; LockedTarget = nil
@@ -93,8 +99,8 @@ UserInputService.InputBegan:Connect(function(i, g)
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and IsValid(p) then
                     if Options.TeamCheck and p.Team == LocalPlayer.Team then continue end
-                    local part = p.Character[Options.TargetPart]
-                    if IsVisible(part) then
+                    local part = p.Character:FindFirstChild(Options.TargetPart)
+                    if part and IsVisible(part) then
                         local pos, on = Camera:WorldToViewportPoint(part.Position)
                         if on then
                             local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
@@ -108,7 +114,7 @@ UserInputService.InputBegan:Connect(function(i, g)
     end
 end)
 
--- [[ محرك الطيران ]]
+-- [[ ميزات اللاعب (سرعة، قفز، طيران) ]]
 local BodyGyro, BodyVelocity
 RunService.RenderStepped:Connect(function()
     if Options.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -136,7 +142,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [[ محرك الشخصية و ESP ]]
 RunService.Stepped:Connect(function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed
@@ -144,6 +149,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+-- [[ نظام ESP ]]
 local function CreateESP(p)
     local Box = Drawing.new("Square"); Box.Thickness = 1; Box.Color = Color3.fromRGB(80, 0, 255)
     local Name = Drawing.new("Text"); Name.Size = 14; Name.Center = true; Name.Outline = true; Name.Color = Color3.new(1,1,1)
@@ -167,7 +173,7 @@ end
 for _, v in pairs(Players:GetPlayers()) do if v ~= LocalPlayer then CreateESP(v) end end
 Players.PlayerAdded:Connect(CreateESP)
 
--- [[ الواجهة الرسومية الكاملة ]]
+-- [[ الواجهة الرسومية ]]
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local Main = Instance.new("Frame", ScreenGui)
 Main.Size = UDim2.new(0, 600, 0, 420); Main.Position = UDim2.new(0.5, -300, 0.5, -210)
