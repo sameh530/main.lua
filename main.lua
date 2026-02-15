@@ -1,4 +1,4 @@
--- [[ SAMEH HUB VIP - V2.5 FULL RESTORED & AIM LOCK FIXED ]]
+-- [[ SAMEH HUB VIP - V2.6 FULL RESTORED & DEATH FIX ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,21 +8,34 @@ local Camera = workspace.CurrentCamera
 
 local Options = {
     Aimbot = false, 
-    AimLock = false, -- الخيار الجديد في Settings
+    AimLock = false, 
     WallCheck = true, 
     TeamCheck = false, 
     TargetPart = "Head", 
-    AimKey = Enum.KeyCode.C, -- الافتراضي C
+    AimKey = Enum.KeyCode.C,
     ESP_Master = false, ESP_Boxes = false, ESP_Names = false, ESP_Tracers = false,
     WalkSpeed = 16, JumpPower = 50, 
     FlyEnabled = false, FlySpeed = 50,
-    MenuKey = Enum.KeyCode.LeftControl -- الافتراضي CTRL
+    MenuKey = Enum.KeyCode.LeftControl
 }
 
 local LockedTarget = nil 
-local IsLocking = false -- متغير داخلي للتحكم في حالة التثبيت
+local IsLocking = false 
 
--- [[ وظيفة فحص الرؤية ]]
+-- [[ وظيفة التحقق المحدثة: تمنع ملاحقة الموتى واللاعبين في الرسبون ]]
+local function IsValid(p)
+    if p and p.Character and p.Character:FindFirstChild(Options.TargetPart) and p.Character:FindFirstChild("Humanoid") then
+        local humanoid = p.Character.Humanoid
+        local rootPart = p.Character:FindFirstChild("HumanoidRootPart")
+        
+        -- التحقق: 1.الصحة أكبر من صفر / 2.الجسم لم ينزل تحت الخريطة (الرسبون)
+        if humanoid.Health > 0 and rootPart and rootPart.Position.Y > -400 then 
+            return true
+        end
+    end
+    return false
+end
+
 local function IsVisible(targetPart)
     if not Options.WallCheck then return true end
     local character = LocalPlayer.Character
@@ -34,28 +47,24 @@ local function IsVisible(targetPart)
     return result == nil
 end
 
--- [[ محرك الايمبوت المطور ]]
+-- [[ محرك الايمبوت المصلح ]]
 RunService.RenderStepped:Connect(function()
     if Options.Aimbot then
-        -- إذا كان Aim Lock مفعلاً، نعتمد على حالة الضغط (Toggle)
         if Options.AimLock then
-            if IsLocking then
-                if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild(Options.TargetPart) and LockedTarget.Character.Humanoid.Health > 0 then
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, LockedTarget.Character[Options.TargetPart].Position)
-                else
-                    IsLocking = false
-                    LockedTarget = nil
-                end
+            if IsLocking and IsValid(LockedTarget) then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, LockedTarget.Character[Options.TargetPart].Position)
+            else
+                IsLocking = false
+                LockedTarget = nil
             end
         else
-            -- إذا كان Aim Lock معطلاً، يعمل فقط عند استمرار الضغط
             if UserInputService:IsKeyDown(Options.AimKey) then
-                if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild(Options.TargetPart) and LockedTarget.Character.Humanoid.Health > 0 then
+                if IsValid(LockedTarget) then
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, LockedTarget.Character[Options.TargetPart].Position)
                 else
                     local target, dist = nil, math.huge
                     for _, p in pairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(Options.TargetPart) and p.Character.Humanoid.Health > 0 then
+                        if p ~= LocalPlayer and IsValid(p) then
                             if Options.TeamCheck and p.Team == LocalPlayer.Team then continue end
                             local part = p.Character[Options.TargetPart]
                             if IsVisible(part) then
@@ -76,17 +85,13 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- رصد ضغطة زر الايمبوت لحالة الـ Aim Lock
 UserInputService.InputBegan:Connect(function(i, g)
     if not g and i.KeyCode == Options.AimKey and Options.Aimbot and Options.AimLock then
-        if IsLocking then
-            IsLocking = false
-            LockedTarget = nil
+        if IsLocking then IsLocking = false; LockedTarget = nil
         else
-            -- ابحث عن هدف لتثبيته
             local target, dist = nil, math.huge
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(Options.TargetPart) and p.Character.Humanoid.Health > 0 then
+                if p ~= LocalPlayer and IsValid(p) then
                     if Options.TeamCheck and p.Team == LocalPlayer.Team then continue end
                     local part = p.Character[Options.TargetPart]
                     if IsVisible(part) then
@@ -98,10 +103,7 @@ UserInputService.InputBegan:Connect(function(i, g)
                     end
                 end
             end
-            if target then
-                LockedTarget = target
-                IsLocking = true
-            end
+            if target then LockedTarget = target; IsLocking = true end
         end
     end
 end)
@@ -134,7 +136,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [[ محرك الشخصية والـ ESP ]]
+-- [[ محرك الشخصية و ESP ]]
 RunService.Stepped:Connect(function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed
@@ -229,25 +231,21 @@ local VisPage = CreateTab("Visuals", 2)
 local PlayerPage = CreateTab("Player", 3)
 local SetPage = CreateTab("Settings", 4)
 
--- Aimbot Page
 AddToggle(AimPage, "Enable Aimbot", "Aimbot")
 AddDropdown(AimPage, "Aim Part", {"Head", "UpperTorso", "HumanoidRootPart"}, "TargetPart")
 AddToggle(AimPage, "Wall Check", "WallCheck")
 AddToggle(AimPage, "Team Check", "TeamCheck")
 
--- Visuals Page
-AddToggle(VisPage, "Enable ESP", "ESP_Master")
+AddToggle(VisPage, "Enable ESP System", "ESP_Master")
 AddToggle(VisPage, "Show Boxes", "ESP_Boxes")
 AddToggle(VisPage, "Show Names", "ESP_Names")
 AddToggle(VisPage, "Show Tracers", "ESP_Tracers")
 
--- Player Page
 AddSlider(PlayerPage, "Walk Speed", 16, 250, "WalkSpeed")
 AddSlider(PlayerPage, "Jump Power", 50, 500, "JumpPower")
 AddToggle(PlayerPage, "Enable Fly", "FlyEnabled")
 AddSlider(PlayerPage, "Fly Speed", 10, 500, "FlySpeed")
 
--- Settings Page
 AddToggle(SetPage, "Aim Lock (Toggle)", "AimLock")
 AddKeybind(SetPage, "Aimbot Key", "AimKey")
 AddKeybind(SetPage, "Menu Key", "MenuKey")
